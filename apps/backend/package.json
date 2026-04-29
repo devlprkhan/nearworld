@@ -5,12 +5,12 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "dev": "dotenv-cli -e .env -- nodemon",
+    "dev": "dotenv -e .env -- nodemon",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
-    "db:migrate": "dotenv-cli -e .env -- prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:studio": "dotenv-cli -e .env -- prisma studio",
+    "db:generate": "pnpm prisma generate",
+    "db:migrate": "dotenv -e .env -- pnpm prisma migrate dev",
+    "db:studio": "dotenv -e .env -- pnpm prisma studio",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },
