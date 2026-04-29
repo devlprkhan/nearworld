@@ -1,0 +1,11 @@
+{
+  "name": "@nearworld/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Frontend not yet implemented'",
+    "build": "echo 'Frontend not yet implemented'",
+    "lint": "echo 'No files to lint'",
+    "typecheck": "echo 'No files to typecheck'"
+  }
+}
