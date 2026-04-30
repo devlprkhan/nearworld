@@ -259,6 +259,7 @@ model user_location {
 
 model users {
   id                                              String               @id @db.Uuid
+  supabase_auth_id                                String?              @unique @db.VarChar(255)
   username                                        String?              @unique @db.VarChar(255)
   email                                           String?              @unique @db.VarChar(255)
   phone                                           String?              @unique @db.VarChar(255)

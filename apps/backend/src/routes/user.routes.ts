@@ -1,12 +1,16 @@
 import { Router } from 'express'
-import * as UserController from '../controllers/user.controller'
+import { authenticate } from '../middleware/auth.middleware'
+import { getMyProfile } from '../controllers/profile.controller'
+import { findOrCreateUser } from '../services/profile.service'
 
 const userRouter = Router()
 
-// GET /api/v1/users
-userRouter.get('/', UserController.getUsers)
+userRouter.get('/me', authenticate, getMyProfile)
 
-// POST /api/v1/users/register
-userRouter.post('/register', UserController.registerUser)
+// TEMPORARY — bypass auth for testing
+userRouter.get('/test-create', async (req, res) => {
+  const user = await findOrCreateUser('630c7912-56e9-4491-a051-82954f739a50', 'test@nearworld.dev')
+  res.json({ user })
+})
 
 export default userRouter

@@ -1,0 +1,25 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+declare global {
+  var supabaseAdmin: SupabaseClient | undefined
+}
+
+export function getSupabaseAdmin(): SupabaseClient {
+  if (!globalThis.supabaseAdmin) {
+    const url = process.env.SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!url || !key) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+    }
+
+    globalThis.supabaseAdmin = createClient(url, key, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+
+  return globalThis.supabaseAdmin
+}
