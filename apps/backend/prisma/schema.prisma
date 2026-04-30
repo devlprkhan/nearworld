@@ -7,12 +7,286 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model bookmarks {
+  id         String   @id @db.Uuid
+  user_id    String   @db.Uuid
+  post_id    String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  posts      posts    @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
 
-  @@map("users")
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model broadcast_media {
+  id                 String             @id @db.Uuid
+  message_id         String             @db.Uuid
+  url                String             @db.VarChar(255)
+  media_type         String             @db.VarChar(255)
+  created_at         DateTime           @default(now()) @db.Timestamp(6)
+  broadcast_messages broadcast_messages @relation(fields: [message_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model broadcast_messages {
+  id                       String               @id @db.Uuid
+  broadcast_id             String               @db.Uuid
+  sender_id                String               @db.Uuid
+  parent_id                String?              @db.Uuid
+  content                  String
+  is_accepted              Boolean              @default(false)
+  upvote_count             Int                  @default(0)
+  downvote_count           Int                  @default(0)
+  created_at               DateTime             @default(now()) @db.Timestamp(6)
+  broadcast_media          broadcast_media[]
+  broadcasts               broadcasts           @relation(fields: [broadcast_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  broadcast_messages       broadcast_messages?  @relation("broadcast_messagesTobroadcast_messages", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_broadcast_messages broadcast_messages[] @relation("broadcast_messagesTobroadcast_messages")
+  users                    users                @relation(fields: [sender_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  broadcast_votes          broadcast_votes[]
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model broadcast_votes {
+  id                 String             @id @db.Uuid
+  message_id         String             @db.Uuid
+  user_id            String             @db.Uuid
+  vote_type          Int                @db.SmallInt
+  broadcast_messages broadcast_messages @relation(fields: [message_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users              users              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model broadcasts {
+  id                 String               @id @db.Uuid
+  creator_id         String               @db.Uuid
+  title              String               @db.VarChar(255)
+  type               String               @db.VarChar(255)
+  lat                Decimal              @db.Decimal
+  lng                Decimal              @db.Decimal
+  radius_meters      Int                  @default(100)
+  is_active          Boolean              @default(true)
+  created_at         DateTime             @default(now()) @db.Timestamp(6)
+  broadcast_messages broadcast_messages[]
+  users              users                @relation(fields: [creator_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model comments {
+  id             String     @id @db.Uuid
+  post_id        String     @db.Uuid
+  user_id        String     @db.Uuid
+  parent_id      String?    @db.Uuid
+  content        String?
+  created_at     DateTime?  @default(now()) @db.Timestamp(6)
+  comments       comments?  @relation("commentsTocomments", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_comments comments[] @relation("commentsTocomments")
+  posts          posts      @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          users      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model follows {
+  id                                String   @id @db.Uuid
+  follower_id                       String   @db.Uuid
+  following_id                      String   @db.Uuid
+  created_at                        DateTime @default(now()) @db.Timestamp(6)
+  users_follows_follower_idTousers  users    @relation("follows_follower_idTousers", fields: [follower_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_follows_following_idTousers users    @relation("follows_following_idTousers", fields: [following_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model hashtags {
+  id            String          @id @db.Uuid
+  name          String          @unique @db.VarChar(255)
+  created_at    DateTime        @default(now()) @db.Timestamp(6)
+  post_hashtags post_hashtags[]
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model likes {
+  id         String   @id @db.Uuid
+  user_id    String   @db.Uuid
+  post_id    String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamp(6)
+  posts      posts    @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model notifications {
+  id                                      String   @id @db.Uuid
+  recipient_id                            String   @db.Uuid
+  actor_id                                String   @db.Uuid
+  type                                    String   @db.VarChar(255)
+  post_id                                 String?  @db.Uuid
+  comment_id                              String?  @db.Uuid
+  broadcast_id                            String?  @db.Uuid
+  message_id                              String?  @db.Uuid
+  is_read                                 Boolean  @default(false)
+  created_at                              DateTime @default(now()) @db.Timestamp(6)
+  users_notifications_actor_idTousers     users    @relation("notifications_actor_idTousers", fields: [actor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_notifications_recipient_idTousers users    @relation("notifications_recipient_idTousers", fields: [recipient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model poll_options {
+  id          String       @id @db.Uuid
+  post_id     String       @db.Uuid
+  option_text String       @db.VarChar(255)
+  posts       posts        @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  poll_votes  poll_votes[]
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model poll_votes {
+  id           String       @id @db.Uuid
+  option_id    String       @db.Uuid
+  user_id      String       @db.Uuid
+  created_at   DateTime     @default(now()) @db.Timestamp(6)
+  poll_options poll_options @relation(fields: [option_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users        users        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model post_extensions {
+  id              String    @id @db.Uuid
+  post_id         String    @unique @db.Uuid
+  event_starts_at DateTime? @db.Timestamp(6)
+  event_ends_at   DateTime? @db.Timestamp(6)
+  event_venue     String?   @db.VarChar(255)
+  poll_expires_at DateTime? @db.Timestamp(6)
+  job_title       String?   @db.VarChar(255)
+  job_company     String?   @db.VarChar(255)
+  price           Decimal?  @db.Decimal
+  item_condition  String?   @db.VarChar(255)
+  lf_type         String?   @db.VarChar(255)
+  is_resolved     Boolean   @default(false)
+  posts           posts     @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model post_hashtags {
+  post_id    String   @db.Uuid
+  hashtag_id String   @db.Uuid
+  hashtags   hashtags @relation(fields: [hashtag_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  posts      posts    @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([post_id, hashtag_id])
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model post_media {
+  id          String   @id @db.Uuid
+  post_id     String   @db.Uuid
+  url         String   @db.VarChar(255)
+  media_type  String   @db.VarChar(255)
+  order_index Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  posts       posts    @relation(fields: [post_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model posts {
+  id              String           @id @db.Uuid
+  user_id         String           @db.Uuid
+  content         String?
+  post_type       String           @db.VarChar(255)
+  broadcast_id    String?          @db.Uuid
+  visibility      String           @default("public") @db.VarChar(255)
+  location_type   String?          @db.VarChar(255)
+  lat             Decimal?         @db.Decimal
+  lng             Decimal?         @db.Decimal
+  place_name      String?          @db.VarChar(255)
+  is_deleted      Boolean          @default(false)
+  likes_count     BigInt           @default(0)
+  comments_count  BigInt           @default(0)
+  reposts_count   BigInt           @default(0)
+  views_count     BigInt           @default(0)
+  created_at      DateTime         @default(now()) @db.Timestamp(6)
+  updated_at      DateTime         @default(now()) @db.Timestamp(6)
+  bookmarks       bookmarks[]
+  comments        comments[]
+  likes           likes[]
+  poll_options    poll_options[]
+  post_extensions post_extensions?
+  post_hashtags   post_hashtags[]
+  post_media      post_media[]
+  users           users            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model reports {
+  id          Int    @id @default(autoincrement())
+  reporter_id String @db.Uuid
+  target_type String @db.VarChar(255)
+  target_id   String @db.Uuid
+  reason      String @db.VarChar(255)
+  status      String @default("PENDING") @db.VarChar(255)
+  users       users  @relation(fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model user_blocks {
+  id                                  String   @id @db.Uuid
+  blocker_id                          String   @db.Uuid
+  blocked_id                          String   @db.Uuid
+  created_at                          DateTime @default(now()) @db.Timestamp(6)
+  users_user_blocks_blocked_idTousers users    @relation("user_blocks_blocked_idTousers", fields: [blocked_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_user_blocks_blocker_idTousers users    @relation("user_blocks_blocker_idTousers", fields: [blocker_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model user_devices {
+  id          String   @id @db.Uuid
+  user_id     String   @db.Uuid
+  fcm_token   String   @db.VarChar(255)
+  device_name String   @db.VarChar(255)
+  device_os   String   @db.VarChar(255)
+  last_active DateTime @default(now()) @db.Timestamp(6)
+  users       users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model user_location {
+  id           String   @id @db.Uuid
+  user_id      String   @db.Uuid
+  lat          Decimal  @db.Decimal
+  lng          Decimal  @db.Decimal
+  place_name   String?  @db.VarChar(255)
+  last_updated DateTime @default(now()) @db.Timestamp(6)
+  users        users    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model users {
+  id                                              String               @id @db.Uuid
+  username                                        String?              @unique @db.VarChar(255)
+  email                                           String?              @unique @db.VarChar(255)
+  phone                                           String?              @unique @db.VarChar(255)
+  full_name                                       String?              @db.VarChar(255)
+  date_of_birth                                   DateTime?            @db.Date
+  avatar_url                                      String?              @db.VarChar(255)
+  bio                                             String?
+  auth_provider                                   String               @db.VarChar(255)
+  is_verified                                     Boolean              @default(false)
+  is_private                                      Boolean              @default(false)
+  is_profile_complete                             Boolean              @default(false)
+  created_at                                      DateTime             @default(now()) @db.Timestamp(6)
+  updated_at                                      DateTime             @default(now()) @db.Timestamp(6)
+  bookmarks                                       bookmarks[]
+  broadcast_messages                              broadcast_messages[]
+  broadcast_votes                                 broadcast_votes[]
+  broadcasts                                      broadcasts[]
+  comments                                        comments[]
+  follows_follows_follower_idTousers              follows[]            @relation("follows_follower_idTousers")
+  follows_follows_following_idTousers             follows[]            @relation("follows_following_idTousers")
+  likes                                           likes[]
+  notifications_notifications_actor_idTousers     notifications[]      @relation("notifications_actor_idTousers")
+  notifications_notifications_recipient_idTousers notifications[]      @relation("notifications_recipient_idTousers")
+  poll_votes                                      poll_votes[]
+  posts                                           posts[]
+  reports                                         reports[]
+  user_blocks_user_blocks_blocked_idTousers       user_blocks[]        @relation("user_blocks_blocked_idTousers")
+  user_blocks_user_blocks_blocker_idTousers       user_blocks[]        @relation("user_blocks_blocker_idTousers")
+  user_devices                                    user_devices[]
+  user_location                                   user_location[]
 }
