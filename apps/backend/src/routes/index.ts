@@ -1,5 +1,5 @@
 import { Router, type Router as RouterType } from 'express'
-import { API_ROUTES } from '@/constants'
+import { API_ROUTES } from '../constants'
 import userRouter from './user.routes'
 import authRouter from './auth.routes'
 

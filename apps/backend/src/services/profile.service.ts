@@ -4,21 +4,30 @@ import { prisma } from '../config/database'
  * Find a user by their Supabase auth ID, or create one if they're new.
  * Called on every authenticated request to ensure the user exists locally.
  */
-export async function findOrCreateUser(supabaseAuthId: string, email?: string, phone?: string) {
+export async function findOrCreateUser(
+  supabaseAuthId: string,
+  email?: string | null,
+  phone?: string | null,
+  authProvider?: string
+) {
   let user = await prisma.users.findUnique({
     where: { supabase_auth_id: supabaseAuthId },
   })
 
   if (!user) {
-    user = await prisma.users.create({
-      data: {
-        id: crypto.randomUUID(),
-        supabase_auth_id: supabaseAuthId,
-        email: email || null,
-        phone: phone || null,
-        auth_provider: 'supabase',
-      },
-    })
+    const data: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      supabase_auth_id: supabaseAuthId,
+      email: email ?? null,
+      auth_provider: authProvider ?? 'email',
+    }
+
+    // Only set phone if it has a value — avoids NULL unique conflict
+    if (phone) {
+      data.phone = phone
+    }
+
+    user = await prisma.users.create({ data: data as any })
   }
 
   return user

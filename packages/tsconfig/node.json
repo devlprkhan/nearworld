@@ -4,7 +4,6 @@
     "lib": ["ES2022"],
     "module": "CommonJS",
     "moduleResolution": "node",
-    "target": "ES2022",
-    "ignoreDeprecation": "6.0"
+    "target": "ES2022"
   }
 }
