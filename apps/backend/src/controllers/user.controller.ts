@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import type { Request, Response } from 'express'
 
 export const getUsers = async (req: Request, res: Response) => {
   // Logic to fetch users from your DB (Prisma/TypeORM) goes here

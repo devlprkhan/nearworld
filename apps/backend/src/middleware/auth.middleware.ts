@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 
 declare global {
@@ -11,7 +11,6 @@ declare global {
   }
 }
 
-// Remove the top-level constant — it caches the wrong value
 let JWKS: ReturnType<typeof createRemoteJWKSet> | null = null
 
 function getJWKS() {
@@ -32,20 +31,22 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 
   const token = authHeader.split(' ')[1]
+  if (!token) {
+    return res.status(401).json({ error: 'Missing token' })
+  }
 
   try {
     const supabaseUrl = process.env.SUPABASE_URL!
-    console.log('SUPABASE_URL being used:', process.env.SUPABASE_URL)
     const { payload } = await jwtVerify(token, getJWKS(), {
       issuer: `${supabaseUrl}/auth/v1`,
       audience: 'authenticated',
     })
 
-    req.userId = payload.sub
-    req.userEmail = payload.email as string | undefined
-    req.userPhone = payload.phone as string | undefined
+    req.userId = payload.sub!
+    req.userEmail = (payload.email as string) ?? undefined
+    req.userPhone = (payload.phone as string) ?? undefined
     next()
-  } catch (error) {
+  } catch {
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
@@ -58,6 +59,8 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   }
 
   const token = authHeader.split(' ')[1]
+  if (!token) return next()
+
   const supabaseUrl = process.env.SUPABASE_URL!
 
   jwtVerify(token, getJWKS(), {
@@ -65,9 +68,9 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
     audience: 'authenticated',
   })
     .then(({ payload }) => {
-      req.userId = payload.sub
-      req.userEmail = payload.email as string | undefined
-      req.userPhone = payload.phone as string | undefined
+      req.userId = payload.sub!
+      req.userEmail = (payload.email as string) ?? undefined
+      req.userPhone = (payload.phone as string) ?? undefined
     })
     .catch(() => {})
     .finally(() => next())
