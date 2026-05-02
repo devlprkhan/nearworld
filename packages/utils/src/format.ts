@@ -12,3 +12,15 @@ export function slugify(str: string): string {
 export function paginate(page: number, pageSize: number) {
   return { skip: (page - 1) * pageSize, take: pageSize }
 }
+
+export function paginatedResponse<T>(data: T[], total: number, page: number, limit: number) {
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  }
+}
