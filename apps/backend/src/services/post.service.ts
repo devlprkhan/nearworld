@@ -1,32 +1,6 @@
 import { prisma } from '../config/database'
 import type { CreatePostInput, Post } from '@nearworld/types'
-import { paginate, paginatedResponse } from '@nearworld/utils'
-
-/**
-POST /api/v1/posts — create post (auth) - Done
-
-GET /api/v1/posts — list posts (paginated, filters: post_type, visibility, hashtag) - Done
-
-GET /api/v1/posts/:id — get single post - Done
-
-PATCH /api/v1/posts/:id — update post (owner only) - Done
-
-DELETE /api/v1/posts/:id — soft delete (owner only) - Done
-
-GET /api/v1/posts/nearby — proximity feed (lat, lng, radius) with Haversine query
-
-GET /api/v1/posts/global — global feed (paginated)
-
-GET /api/v1/posts/:id/comments — nested comments
-
-POST /api/v1/posts/:id/comments — add comment (auth)
-
-POST /api/v1/posts/:id/like — like/unlike toggle (auth)
-
-POST /api/v1/posts/:id/bookmark — bookmark toggle (auth)
-
-POST /api/v1/posts/:id/repost — repost (auth)
- */
+import { paginate, paginatedResponse, formatDate } from '@nearworld/utils'
 
 export async function createPost(userId: string, input: CreatePostInput): Promise<Post> {
   const post = await prisma.posts.create({
@@ -149,7 +123,7 @@ export async function deletePost(postId: string): Promise<void> {
     where: { id: postId },
     data: {
       is_deleted: true,
-      updated_at: new Date(),
+      updated_at: formatDate(new Date()),
     },
   })
 }
@@ -209,4 +183,181 @@ export async function toggleLike(userId: string, postId: string): Promise<{ like
     }),
   ])
   return { liked: true }
+}
+
+export async function getNearbyPosts(options: {
+  lat: number
+  lng: number
+  radius?: number // in km, default 10
+  page?: number
+  limit?: number
+}): Promise<{
+  data: Post[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+}> {
+  const radius = options.radius ?? 10
+  const page = options.page ?? 1
+  const limit = options.limit ?? 10
+  const { skip, take } = paginate(page, limit)
+
+  const lat = options.lat
+  const lng = options.lng
+
+  const posts = await prisma.$queryRawUnsafe<Post[]>(
+    `SELECT p.*,
+      (6371 * acos(cos(radians($1)) * cos(radians(p.lat::float)) * cos(radians(p.lng::float) - radians($2)) + sin(radians($1)) * sin(radians(p.lat::float)))) AS distance
+    FROM "posts" p
+    WHERE p.is_deleted = false
+      AND p.lat IS NOT NULL
+      AND p.lng IS NOT NULL
+      AND (6371 * acos(cos(radians($1)) * cos(radians(p.lat::float)) * cos(radians(p.lng::float) - radians($2)) + sin(radians($1)) * sin(radians(p.lat::float)))) <= $3
+    ORDER BY p.created_at DESC
+    LIMIT $4 OFFSET $5`,
+    lat,
+    lng,
+    radius,
+    take,
+    skip
+  )
+
+  const countResult = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
+    `SELECT COUNT(*) as count
+    FROM "posts" p
+    WHERE p.is_deleted = false
+      AND p.lat IS NOT NULL
+      AND p.lng IS NOT NULL
+      AND (6371 * acos(cos(radians($1)) * cos(radians(p.lat::float)) * cos(radians(p.lng::float) - radians($2)) + sin(radians($1)) * sin(radians(p.lat::float)))) <= $3`,
+    lat,
+    lng,
+    radius
+  )
+
+  const total = Number(countResult[0]?.count ?? 0)
+
+  return paginatedResponse(posts, total, page, limit)
+}
+
+export async function getPostComments(postId: string, page?: number, limit?: number) {
+  const p = page ?? 1
+  const l = limit ?? 20
+  const { skip, take } = paginate(p, l)
+
+  const [comments, total] = await Promise.all([
+    prisma.comments.findMany({
+      where: { post_id: postId, parent_id: null },
+      skip,
+      take,
+      orderBy: { created_at: 'asc' },
+      include: {
+        users: {
+          select: { id: true, username: true, full_name: true, avatar_url: true },
+        },
+        other_comments: {
+          include: {
+            users: {
+              select: { id: true, username: true, full_name: true, avatar_url: true },
+            },
+          },
+        },
+      },
+    }),
+    prisma.comments.count({ where: { post_id: postId } }),
+  ])
+
+  return paginatedResponse(comments, total, p, l)
+}
+
+export async function addComment(
+  userId: string,
+  postId: string,
+  content: string,
+  parentId?: string
+) {
+  const [comment] = await prisma.$transaction([
+    prisma.comments.create({
+      data: {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        post_id: postId,
+        content,
+        parent_id: parentId ?? null,
+      },
+      include: {
+        users: {
+          select: { id: true, username: true, full_name: true, avatar_url: true },
+        },
+      },
+    }),
+    prisma.posts.update({
+      where: { id: postId },
+      data: { comments_count: { increment: 1 } },
+    }),
+  ])
+
+  return comment
+}
+
+export async function getGlobalFeed(options: { page?: number; limit?: number }): Promise<{
+  data: Post[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+}> {
+  const page = options.page ?? 1
+  const limit = options.limit ?? 10
+  const { skip, take } = paginate(page, limit)
+
+  const where: any = {
+    is_deleted: false,
+    visibility: 'public',
+    OR: [{ location_type: 'global' }, { lat: null, lng: null }],
+  }
+
+  const [posts, total] = await Promise.all([
+    prisma.posts.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { created_at: 'desc' },
+      include: {
+        users: {
+          select: { id: true, username: true, full_name: true, avatar_url: true },
+        },
+      },
+    }),
+    prisma.posts.count({ where }),
+  ])
+
+  return paginatedResponse(posts as unknown as Post[], total, page, limit)
+}
+
+export async function repost(userId: string, postId: string): Promise<Post> {
+  const original = await prisma.posts.findUnique({ where: { id: postId } })
+
+  if (!original) throw new Error('Post not found')
+
+  const [newPost] = await prisma.$transaction([
+    prisma.posts.create({
+      data: {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        content: original.content,
+        post_type: original.post_type,
+        visibility: original.visibility,
+        location_type: original.location_type,
+        lat: original.lat,
+        lng: original.lng,
+        place_name: original.place_name,
+      },
+      include: {
+        users: {
+          select: { id: true, username: true, full_name: true, avatar_url: true },
+        },
+      },
+    }),
+    prisma.posts.update({
+      where: { id: postId },
+      data: { reposts_count: { increment: 1 } },
+    }),
+  ])
+
+  return newPost as unknown as Post
 }
