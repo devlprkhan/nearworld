@@ -11,7 +11,7 @@ GET /api/v1/posts/:id — get single post - Done
 
 PATCH /api/v1/posts/:id — update post (owner only) - Done
 
-DELETE /api/v1/posts/:id — soft delete (owner only)
+DELETE /api/v1/posts/:id — soft delete (owner only) - Done
 
 GET /api/v1/posts/nearby — proximity feed (lat, lng, radius) with Haversine query
 
@@ -142,4 +142,71 @@ export async function updatePost(
   })
 
   return post as unknown as Post
+}
+
+export async function deletePost(postId: string): Promise<void> {
+  await prisma.posts.update({
+    where: { id: postId },
+    data: {
+      is_deleted: true,
+      updated_at: new Date(),
+    },
+  })
+}
+
+export async function toggleBookmark(
+  userId: string,
+  postId: string
+): Promise<{ bookmarked: boolean }> {
+  const exists = await prisma.bookmarks.findFirst({
+    where: { post_id: postId, user_id: userId },
+  })
+
+  if (exists) {
+    await prisma.bookmarks.delete({
+      where: { id: exists.id },
+    })
+    return { bookmarked: false }
+  }
+
+  await prisma.bookmarks.create({
+    data: {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      post_id: postId,
+    },
+  })
+  return { bookmarked: true }
+}
+
+export async function toggleLike(userId: string, postId: string): Promise<{ liked: boolean }> {
+  const existing = await prisma.likes.findFirst({
+    where: { user_id: userId, post_id: postId },
+  })
+
+  if (existing) {
+    await prisma.$transaction([
+      prisma.likes.delete({ where: { id: existing.id } }),
+      prisma.posts.update({
+        where: { id: postId },
+        data: { likes_count: { decrement: 1 } },
+      }),
+    ])
+    return { liked: false }
+  }
+
+  await prisma.$transaction([
+    prisma.likes.create({
+      data: {
+        id: crypto.randomUUID(),
+        user_id: userId,
+        post_id: postId,
+      },
+    }),
+    prisma.posts.update({
+      where: { id: postId },
+      data: { likes_count: { increment: 1 } },
+    }),
+  ])
+  return { liked: true }
 }
